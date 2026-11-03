@@ -10,6 +10,7 @@ use App\Models\Customer;
 use App\Models\Organization;
 use App\Models\CreditCollection;
 use App\Models\AuditLog;
+use App\Models\User;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 
@@ -38,6 +39,22 @@ class BillingController extends Controller
             $query->where('is_handed', $request->boolean('is_handed'));
         }
 
+        if ($request->filled('from_date')) {
+            $query->whereDate('created_at', '>=', $request->from_date);
+        }
+
+        if ($request->filled('to_date')) {
+            $query->whereDate('created_at', '<=', $request->to_date);
+        }
+
+        if ($request->filled('from_date')) {
+            $query->whereDate('created_at', '>=', $request->from_date);
+        }
+
+        if ($request->filled('to_date')) {
+            $query->whereDate('created_at', '<=', $request->to_date);
+        }
+
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function($q) use ($search) {
@@ -58,7 +75,17 @@ class BillingController extends Controller
         $summaryQuery = Bill::query();
         if ($user->isEngineer()) {
             $summaryQuery->where('created_by', $user->id);
+        } elseif ($request->filled('engineer_id')) {
+            $summaryQuery->where('created_by', $request->engineer_id);
         }
+
+        if ($request->filled('from_date')) {
+            $summaryQuery->whereDate('created_at', '>=', $request->from_date);
+        }
+        if ($request->filled('to_date')) {
+            $summaryQuery->whereDate('created_at', '<=', $request->to_date);
+        }
+
         $totals = $summaryQuery->selectRaw("
             COALESCE(SUM(amount), 0) as total_billed,
             COALESCE(SUM(CASE WHEN bill_type = 'cash' THEN amount ELSE 0 END), 0) as cash_collected,
@@ -72,8 +99,9 @@ class BillingController extends Controller
         $creditPending = (float)$totals->credit_pending;
         $gstTotal = (float)$totals->gst_total;
         $cashPendingHandover = (float)$totals->cash_pending_handover;
+        $engineers = User::where('role', 'engineer')->orderBy('name')->get();
 
-        return view('billing.index', compact('bills', 'totalBilled', 'cashCollected', 'creditPending', 'gstTotal', 'cashPendingHandover'));
+        return view('billing.index', compact('bills', 'totalBilled', 'cashCollected', 'creditPending', 'gstTotal', 'cashPendingHandover', 'engineers'));
     }
 
     public function exportCsv(Request $request)
@@ -95,6 +123,14 @@ class BillingController extends Controller
 
         if ($request->has('is_handed') && $request->is_handed !== '') {
             $query->where('is_handed', $request->boolean('is_handed'));
+        }
+
+        if ($request->filled('from_date')) {
+            $query->whereDate('created_at', '>=', $request->from_date);
+        }
+
+        if ($request->filled('to_date')) {
+            $query->whereDate('created_at', '<=', $request->to_date);
         }
 
         if ($request->filled('search')) {

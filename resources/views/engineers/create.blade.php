@@ -45,7 +45,7 @@
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div>
                             <label class="block text-xs font-semibold text-primary-text mb-1.5">Full Name <span class="text-app-error">*</span></label>
-                            <input type="text" name="name" value="{{ old('name') }}" required placeholder="e.g. Rahul Sharma" class="w-full text-xs rounded-lg border-app-border bg-white focus:ring-secondary focus:border-secondary py-2.5 px-3">
+                            <input type="text" name="name" value="{{ old('name') }}" required placeholder="Enter engineer full name" class="w-full text-xs rounded-lg border-app-border bg-white focus:ring-secondary focus:border-secondary py-2.5 px-3">
                             @error('name')<p class="text-[11px] text-app-error mt-1">{{ $message }}</p>@enderror
                         </div>
 
@@ -54,7 +54,7 @@
                             <div class="flex items-center gap-1.5">
                                 <input type="hidden" name="country_code" value="+91">
                                 <span class="px-2.5 py-2.5 rounded-lg border border-app-border bg-app-bg text-xs font-bold text-primary-text">+91</span>
-                                <input type="tel" name="phone_no" value="{{ old('phone_no') }}" required placeholder="10-digit number" class="w-full text-xs rounded-lg border-app-border bg-white focus:ring-secondary focus:border-secondary py-2.5 px-3">
+                                <input type="tel" name="phone_no" value="{{ old('phone_no') }}" required placeholder="Enter 10-digit mobile number" class="w-full text-xs rounded-lg border-app-border bg-white focus:ring-secondary focus:border-secondary py-2.5 px-3">
                             </div>
                             @error('phone_no')<p class="text-[11px] text-app-error mt-1">{{ $message }}</p>@enderror
                             @error('country_code')<p class="text-[11px] text-app-error mt-1">{{ $message }}</p>@enderror
@@ -81,17 +81,17 @@
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div>
                             <label class="block text-xs font-semibold text-primary-text mb-1.5">Email Address</label>
-                            <input type="email" name="email" value="{{ old('email') }}" placeholder="rahul@bhumitechnocare.com" class="w-full text-xs rounded-lg border-app-border bg-white focus:ring-secondary focus:border-secondary py-2.5 px-3">
+                            <input type="email" name="email" value="{{ old('email') }}" placeholder="Enter email address (optional)" class="w-full text-xs rounded-lg border-app-border bg-white focus:ring-secondary focus:border-secondary py-2.5 px-3">
                         </div>
 
                         <div>
                             <label class="block text-xs font-semibold text-primary-text mb-1.5">Department</label>
-                            <input type="text" name="department" value="{{ old('department', 'CNC & Machinery Service') }}" placeholder="e.g. CNC & Industrial Automation" class="w-full text-xs rounded-lg border-app-border bg-white focus:ring-secondary focus:border-secondary py-2.5 px-3">
+                            <input type="text" name="department" value="{{ old('department') }}" placeholder="Enter department name" class="w-full text-xs rounded-lg border-app-border bg-white focus:ring-secondary focus:border-secondary py-2.5 px-3">
                         </div>
 
                         <div>
                             <label class="block text-xs font-semibold text-primary-text mb-1.5">Designation / Post</label>
-                            <input type="text" name="post" value="{{ old('post', 'Senior Field Engineer') }}" placeholder="e.g. Field Service Specialist" class="w-full text-xs rounded-lg border-app-border bg-white focus:ring-secondary focus:border-secondary py-2.5 px-3">
+                            <input type="text" name="post" value="{{ old('post') }}" placeholder="Enter designation or post" class="w-full text-xs rounded-lg border-app-border bg-white focus:ring-secondary focus:border-secondary py-2.5 px-3">
                         </div>
                     </div>
                 </div>
@@ -129,17 +129,17 @@
 
                         <div>
                             <label class="block text-xs font-semibold text-primary-text mb-1.5">Emergency Family Contact</label>
-                            <input type="tel" name="family_contact_no" value="{{ old('family_contact_no') }}" placeholder="e.g. 9825001122" class="w-full text-xs rounded-lg border-app-border bg-white focus:ring-secondary focus:border-secondary py-2.5 px-3">
+                            <input type="tel" name="family_contact_no" value="{{ old('family_contact_no') }}" placeholder="Enter emergency family contact" class="w-full text-xs rounded-lg border-app-border bg-white focus:ring-secondary focus:border-secondary py-2.5 px-3">
                         </div>
 
                         <div class="sm:col-span-3">
                             <label class="block text-xs font-semibold text-primary-text mb-1.5">Residential Street Address</label>
-                            <textarea name="address" rows="2" placeholder="Residential house, apartment, street, city..." class="w-full text-xs rounded-lg border-app-border bg-white focus:ring-secondary focus:border-secondary p-3">{{ old('address') }}</textarea>
+                            <textarea name="address" rows="2" placeholder="Enter residential address" class="w-full text-xs rounded-lg border-app-border bg-white focus:ring-secondary focus:border-secondary p-3">{{ old('address') }}</textarea>
                         </div>
 
                         <div class="sm:col-span-3">
                             <label class="block text-xs font-semibold text-primary-text mb-1.5">Internal Remarks / HR Notes</label>
-                            <textarea name="remarks" rows="2" placeholder="Additional notes or remarks regarding this staff member..." class="w-full text-xs rounded-lg border-app-border bg-white focus:ring-secondary focus:border-secondary p-3">{{ old('remarks') }}</textarea>
+                            <textarea name="remarks" rows="2" placeholder="Enter HR notes or remarks (optional)" class="w-full text-xs rounded-lg border-app-border bg-white focus:ring-secondary focus:border-secondary p-3">{{ old('remarks') }}</textarea>
                         </div>
                     </div>
                 </div>

@@ -6,9 +6,35 @@
 @section('content')
 <div class="space-y-3" x-data="{ 
     filterModalOpen: false,
+    exportModalOpen: false,
     previewPhotoOpen: false,
     previewPhotoUrl: '',
     previewPhotoTitle: '',
+    exportFromDate: '{{ request('from_date', '') }}',
+    exportToDate: '{{ request('to_date', '') }}',
+    setExportPreset(type) {
+        const today = new Date();
+        const pad = (n) => String(n).padStart(2, '0');
+        const formatDate = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+        if (type === 'all') {
+            this.exportFromDate = '';
+            this.exportToDate = '';
+        } else if (type === 'today') {
+            const d = formatDate(today);
+            this.exportFromDate = d;
+            this.exportToDate = d;
+        } else if (type === 'this_month') {
+            const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+            this.exportFromDate = formatDate(firstDay);
+            this.exportToDate = formatDate(today);
+        } else if (type === 'last_month') {
+            const firstDay = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            const lastDay = new Date(today.getFullYear(), today.getMonth(), 0);
+            this.exportFromDate = formatDate(firstDay);
+            this.exportToDate = formatDate(lastDay);
+        }
+    },
     openPhotoPreview(url, title) {
         this.previewPhotoUrl = url;
         this.previewPhotoTitle = title;
@@ -83,14 +109,15 @@
         <!-- Action Buttons (Responsive flex row on phone) -->
         <div class="flex items-center justify-between sm:justify-end gap-1.5 shrink-0">
             
-            <!-- 1. Export (Compact Excel / CSV button, Admin Only) -->
+            <!-- 1. Export (Opens Filter & Date Modal, Admin Only) -->
             @if(auth()->user()->isAdmin())
-                <a href="{{ route('billing.export', request()->query()) }}" 
-                   class="flex-1 sm:flex-none inline-flex items-center justify-center space-x-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-2xs transition active:scale-95" 
-                   title="Export Excel / CSV Spreadsheet">
+                <button type="button" 
+                        @click="exportModalOpen = true" 
+                        class="flex-1 sm:flex-none inline-flex items-center justify-center space-x-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-2xs transition active:scale-95" 
+                        title="Export Excel / CSV with Date Range Filter">
                     <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i>
                     <span>Export</span>
-                </a>
+                </button>
             @endif
 
             <!-- 2. Filter Button -->
@@ -448,6 +475,18 @@
                     </div>
                 </div>
 
+                <!-- Date Range Filters -->
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-[11px] font-bold text-textMain uppercase tracking-wider mb-1">From Date (कब से)</label>
+                        <input type="date" name="from_date" value="{{ request('from_date') }}" class="w-full px-2.5 py-2 text-xs rounded-xl border border-borderMain bg-bg outline-none focus:border-primary">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-textMain uppercase tracking-wider mb-1">To Date (कब तक का)</label>
+                        <input type="date" name="to_date" value="{{ request('to_date') }}" class="w-full px-2.5 py-2 text-xs rounded-xl border border-borderMain bg-bg outline-none focus:border-primary">
+                    </div>
+                </div>
+
                 <div>
                     <label class="block text-[11px] font-bold text-textMain uppercase tracking-wider mb-1">Payment Mode</label>
                     <select name="bill_type" class="w-full px-3 py-2 text-xs rounded-xl border border-borderMain bg-bg outline-none focus:border-primary">
@@ -457,6 +496,20 @@
                         <option value="bill" {{ request('bill_type') == 'bill' ? 'selected' : '' }}>GST Tax Bill</option>
                     </select>
                 </div>
+
+                @if(isset($engineers) && $engineers->isNotEmpty())
+                <div>
+                    <label class="block text-[11px] font-bold text-textMain uppercase tracking-wider mb-1">Field Engineer</label>
+                    <select name="engineer_id" class="w-full px-3 py-2 text-xs rounded-xl border border-borderMain bg-bg outline-none focus:border-primary">
+                        <option value="">All Engineers</option>
+                        @foreach($engineers as $eng)
+                            <option value="{{ $eng->id }}" {{ request('engineer_id') == $eng->id ? 'selected' : '' }}>
+                                {{ $eng->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+                @endif
 
                 <div>
                     <label class="block text-[11px] font-bold text-textMain uppercase tracking-wider mb-1">Handover Status</label>
@@ -483,6 +536,154 @@
             </form>
         </div>
     </div>
+
+    <!-- 8. EXPORT FILTER MODAL (ADMIN ONLY) -->
+    @if(auth()->user()->isAdmin())
+    <div x-show="exportModalOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" @click="exportModalOpen = false"></div>
+
+        <div class="relative w-full max-w-lg bg-surface rounded-3xl shadow-2xl border border-borderMain p-5 sm:p-6 z-50 max-h-[92vh] overflow-y-auto">
+            <div class="flex items-center justify-between pb-3.5 border-b border-borderMain">
+                <div class="flex items-center space-x-2.5">
+                    <div class="w-9 h-9 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold shadow-2xs border border-emerald-200">
+                        <i data-lucide="file-spreadsheet" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-extrabold text-sm sm:text-base text-textMain">Export Billing Ledger</h3>
+                        <p class="text-[11px] text-textMuted">Excel / CSV export with date range & custom filters</p>
+                    </div>
+                </div>
+                <button type="button" @click="exportModalOpen = false" class="text-textMuted hover:text-textMain p-1 rounded-lg">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+            <form action="{{ route('billing.export') }}" method="GET" class="mt-4 space-y-4">
+                
+                <!-- Quick Date Range Presets -->
+                <div>
+                    <label class="block text-[11px] font-bold text-textMain uppercase tracking-wider mb-1.5">
+                        Quick Date Presets / त्वरित अवधि
+                    </label>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-xs">
+                        <button type="button" 
+                                @click="setExportPreset('all')" 
+                                class="py-1.5 px-2 rounded-xl border border-borderMain bg-bg hover:bg-slate-200 text-slate-800 font-bold transition text-center text-[11px]">
+                            All Records (सारा)
+                        </button>
+                        <button type="button" 
+                                @click="setExportPreset('today')" 
+                                class="py-1.5 px-2 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold transition text-center text-[11px]">
+                            Today (आज)
+                        </button>
+                        <button type="button" 
+                                @click="setExportPreset('this_month')" 
+                                class="py-1.5 px-2 rounded-xl border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-800 font-bold transition text-center text-[11px]">
+                            This Month (इस माह)
+                        </button>
+                        <button type="button" 
+                                @click="setExportPreset('last_month')" 
+                                class="py-1.5 px-2 rounded-xl border border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-800 font-bold transition text-center text-[11px]">
+                            Last Month (पिछला)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Custom Date Range (Kab se & Kab tak ka bill chahiye) -->
+                <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-black text-slate-800">Date Range / कब तक का बिल चाहिए</span>
+                        <span class="text-[10px] text-textMuted">Optional filter</span>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div>
+                            <label class="block text-[10.5px] font-bold text-slate-700 mb-1">
+                                From Date (कब से)
+                            </label>
+                            <input type="date" 
+                                   name="from_date" 
+                                   x-model="exportFromDate" 
+                                   class="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white outline-none focus:border-primary">
+                        </div>
+                        <div>
+                            <label class="block text-[10.5px] font-bold text-slate-700 mb-1">
+                                To Date (कब तक का / Target Date)
+                            </label>
+                            <input type="date" 
+                                   name="to_date" 
+                                   x-model="exportToDate" 
+                                   class="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white outline-none focus:border-primary">
+                        </div>
+                    </div>
+                    <p class="text-[10.5px] text-slate-500">
+                        Leave blank to export all time records, or pick "To Date" to export bills up to that day.
+                    </p>
+                </div>
+
+                <!-- Payment Type Filter -->
+                <div>
+                    <label class="block text-[11px] font-bold text-textMain uppercase tracking-wider mb-1">
+                        Payment Type (भुगतान का प्रकार)
+                    </label>
+                    <select name="bill_type" class="w-full px-3 py-2 text-xs rounded-xl border border-borderMain bg-bg outline-none focus:border-primary">
+                        <option value="">All Payment Types (Cash, Credit & GST)</option>
+                        <option value="cash">Cash Only</option>
+                        <option value="credit">Credit Only</option>
+                        <option value="bill">GST Tax Invoices Only</option>
+                    </select>
+                </div>
+
+                <!-- Field Engineer Filter -->
+                @if(isset($engineers) && $engineers->isNotEmpty())
+                <div>
+                    <label class="block text-[11px] font-bold text-textMain uppercase tracking-wider mb-1">
+                        Field Engineer (इंजीनियर)
+                    </label>
+                    <select name="engineer_id" class="w-full px-3 py-2 text-xs rounded-xl border border-borderMain bg-bg outline-none focus:border-primary">
+                        <option value="">All Field Engineers</option>
+                        @foreach($engineers as $eng)
+                            <option value="{{ $eng->id }}">
+                                {{ $eng->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+                @endif
+
+                <!-- Handover Status Filter -->
+                <div>
+                    <label class="block text-[11px] font-bold text-textMain uppercase tracking-wider mb-1">
+                        Cash Handover Status
+                    </label>
+                    <select name="is_handed" class="w-full px-3 py-2 text-xs rounded-xl border border-borderMain bg-bg outline-none focus:border-primary">
+                        <option value="">All Statuses</option>
+                        <option value="1">Verified Handed Over</option>
+                        <option value="0">Pending Handover</option>
+                    </select>
+                </div>
+
+                <!-- Excel Formatting Notice -->
+                <div class="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200 text-emerald-900 text-[11px] flex items-center gap-2">
+                    <i data-lucide="check-circle" class="w-4 h-4 text-emerald-600 shrink-0"></i>
+                    <span>Exported format: <strong>Bill No, Date/Time, Amount, Payment, Remark, Photo URL</strong> (UTF-8 Excel Compatible).</span>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex items-center justify-between pt-3 border-t border-borderMain gap-3">
+                    <button type="button" @click="exportModalOpen = false" class="px-4 py-2 rounded-xl border border-borderMain text-xs font-semibold text-textMain hover:bg-bg transition">
+                        Cancel
+                    </button>
+                    <button type="submit" 
+                            @click="setTimeout(() => { exportModalOpen = false; }, 800)"
+                            class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-md transition flex items-center space-x-2 active:scale-95">
+                        <i data-lucide="download" class="w-4 h-4"></i>
+                        <span>Download Export File (CSV / Excel)</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    @endif
 
 </div>
 @endsection

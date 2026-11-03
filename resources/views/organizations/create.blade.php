@@ -139,7 +139,7 @@
                         <!-- Supervisor Contact Person -->
                         <div>
                             <label class="block text-xs font-semibold text-primary-text mb-1">Plant Manager / Supervisor Name</label>
-                            <input type="text" name="contact_person" value="{{ old('contact_person') }}" placeholder="e.g. Ramesh Patel (Plant Manager)" class="w-full text-xs rounded-lg border-app-border bg-white focus:ring-1 focus:ring-secondary py-2.5 px-3">
+                            <input type="text" name="contact_person" value="{{ old('contact_person') }}" placeholder="Enter supervisor / plant manager name" class="w-full text-xs rounded-lg border-app-border bg-white focus:ring-1 focus:ring-secondary py-2.5 px-3">
                         </div>
 
                         <!-- Machinery & Equipment Notes -->

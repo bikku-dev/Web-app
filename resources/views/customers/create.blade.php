@@ -48,7 +48,7 @@
                             <label class="block text-xs font-semibold text-primary-text mb-1">
                                 Customer Name <span class="text-app-error">*</span>
                             </label>
-                            <input type="text" name="name" value="{{ old('name') }}" required placeholder="e.g. Ramesh Patel" class="w-full text-xs rounded-lg border-app-border bg-white focus:ring-1 focus:ring-secondary py-2.5 px-3">
+                            <input type="text" name="name" value="{{ old('name') }}" required placeholder="Enter customer full name" class="w-full text-xs rounded-lg border-app-border bg-white focus:ring-1 focus:ring-secondary py-2.5 px-3">
                             @error('name')<p class="text-[11px] text-app-error mt-1">{{ $message }}</p>@enderror
                         </div>
 
@@ -59,7 +59,7 @@
                             </label>
                             <div class="relative">
                                 <span class="absolute left-3 top-2.5 text-xs text-secondary-text font-medium">+91</span>
-                                <input type="tel" name="contact_no" value="{{ old('contact_no') }}" required placeholder="9825123456" class="w-full text-xs rounded-lg border-app-border bg-white focus:ring-1 focus:ring-secondary py-2.5 pl-11 pr-3">
+                                <input type="tel" name="contact_no" value="{{ old('contact_no') }}" required placeholder="Enter 10-digit mobile number" class="w-full text-xs rounded-lg border-app-border bg-white focus:ring-1 focus:ring-secondary py-2.5 pl-11 pr-3">
                             </div>
                             @error('contact_no')<p class="text-[11px] text-app-error mt-1">{{ $message }}</p>@enderror
                         </div>
