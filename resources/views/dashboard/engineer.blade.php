@@ -221,12 +221,58 @@
                             @endif
                         </div>
 
-                        <!-- 1-Tap Call & Map Action Buttons -->
+                        <!-- 1-Tap Call, WhatsApp (Regular / Business) & Map Action Buttons -->
                         <div class="flex items-center gap-1.5 shrink-0">
                             @if($ticket->customer?->contact_no)
+                                @php
+                                    $rawEngPhone = preg_replace('/[^0-9]/', '', $ticket->customer->contact_no);
+                                    $waEngPhone = strlen($rawEngPhone) === 10 ? '91' . $rawEngPhone : $rawEngPhone;
+                                @endphp
+                                <!-- Call -->
                                 <a href="tel:{{ $ticket->customer->contact_no }}" class="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white flex items-center justify-center transition shadow-2xs active:scale-95" title="Call Customer">
                                     <i data-lucide="phone" class="w-3.5 h-3.5"></i>
                                 </a>
+
+                                <!-- WhatsApp with Choice Popup -->
+                                <div class="relative" x-data="{ waMenuOpen: false }">
+                                    <button type="button" 
+                                            @click="waMenuOpen = !waMenuOpen" 
+                                            class="w-8 h-8 rounded-xl bg-emerald-50 text-[#25D366] hover:bg-[#25D366] hover:text-white flex items-center justify-center transition shadow-2xs active:scale-95" 
+                                            title="WhatsApp Customer (Regular or Business)">
+                                        <i data-lucide="message-circle" class="w-3.5 h-3.5"></i>
+                                    </button>
+
+                                    <!-- Dropdown Menu -->
+                                    <div x-show="waMenuOpen" 
+                                         @click.outside="waMenuOpen = false" 
+                                         x-cloak 
+                                         class="absolute right-0 top-9 z-30 w-48 bg-white rounded-2xl shadow-xl border border-borderMain p-1.5 divide-y divide-slate-100 text-left">
+                                        <div class="px-2 py-1 text-[9.5px] font-black uppercase tracking-wider text-slate-400">
+                                            WhatsApp Chat
+                                        </div>
+                                        <div class="py-1 space-y-0.5">
+                                            <a href="https://web.whatsapp.com/send?phone={{ $waEngPhone }}" 
+                                               onclick="window.openWhatsAppDirect(event, '{{ $waEngPhone }}', 'regular')" 
+                                               target="_blank" 
+                                               @click="waMenuOpen = false"
+                                               class="w-full px-2 py-1.5 rounded-xl hover:bg-emerald-50 flex items-center space-x-2 text-xs font-bold text-slate-800 transition">
+                                                <i data-lucide="message-circle" class="w-3 h-3 text-[#25D366]"></i>
+                                                <span>WhatsApp (Regular)</span>
+                                            </a>
+                                            <a href="https://wa.me/{{ $waEngPhone }}" 
+                                               onclick="window.openWhatsAppDirect(event, '{{ $waEngPhone }}', 'business')" 
+                                               target="_blank" 
+                                               @click="waMenuOpen = false"
+                                               class="w-full px-2 py-1.5 rounded-xl hover:bg-teal-50 flex items-center space-x-2 text-xs font-bold text-slate-800 transition">
+                                                <svg class="w-3 h-3 text-[#128C7E]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+                                                    <text x="12" y="14.5" font-size="8" font-weight="900" text-anchor="middle" fill="currentColor" stroke="none">B</text>
+                                                </svg>
+                                                <span>WhatsApp Business</span>
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
                             @endif
                             @if($ticket->customer?->address || $ticket->customer?->name)
                                 <a href="https://www.google.com/maps/search/?api=1&query={{ urlencode(($ticket->customer?->address ? $ticket->customer->address . ', ' : '') . ($ticket->customer?->name ?? 'Surat')) }}" target="_blank" class="w-8 h-8 rounded-xl bg-blue-50 text-secondary hover:bg-secondary hover:text-white flex items-center justify-center transition shadow-2xs active:scale-95" title="Open Map">

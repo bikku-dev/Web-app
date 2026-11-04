@@ -8,16 +8,29 @@
      x-data="{
         customerMode: '{{ old('customer_mode', 'existing') }}',
         selectedCustomerId: '{{ old('customer_id', '') }}',
+        customerSearch: '',
+        customerDropdownOpen: false,
         showNewAreaInput: {{ old('new_area_name') ? 'true' : 'false' }},
         showNewFirmInput: {{ old('new_firm_name') ? 'true' : 'false' }},
-        showNewProductInput: {{ old('new_product_type') ? 'true' : 'false' }},
         showNewServiceInput: {{ old('new_service_type') ? 'true' : 'false' }},
         customers: {{ Js::from($customers) }},
         selectedCustomer: null,
+        predictedIds: {{ Js::from($predictedIds) }},
+        selectedProductId: '{{ old('product_type_id', $productTypes->first()?->id ?? '') }}',
+
+        get currentTicketId() {
+            return this.predictedIds[this.selectedProductId] || 'C2611001';
+        },
 
         init() {
             this.updateCustomerDetails();
             this.$watch('selectedCustomerId', () => this.updateCustomerDetails());
+            if (this.selectedCustomerId) {
+                const c = this.customers.find(item => item.id == this.selectedCustomerId);
+                if (c) {
+                    this.customerSearch = c.name + ' (' + c.contact_no + ')';
+                }
+            }
         },
 
         updateCustomerDetails() {
@@ -26,6 +39,36 @@
                 return;
             }
             this.selectedCustomer = this.customers.find(c => c.id == this.selectedCustomerId) || null;
+        },
+
+        get filteredCustomers() {
+            const raw = (this.customerSearch || '').trim();
+            const isCurrentSelectedLabel = this.selectedCustomer && (raw === this.selectedCustomer.name + ' (' + this.selectedCustomer.contact_no + ')' || raw === this.selectedCustomer.name);
+            if (!raw || isCurrentSelectedLabel) {
+                return this.customers.slice(0, 25);
+            }
+            const q = raw.toLowerCase();
+            return this.customers.filter(c => {
+                const name = (c.name || '').toLowerCase();
+                const phone = (c.contact_no || '').toLowerCase();
+                const firm = (c.organization?.name || '').toLowerCase();
+                const area = (c.area?.name || '').toLowerCase();
+                return name.includes(q) || phone.includes(q) || firm.includes(q) || area.includes(q);
+            }).slice(0, 40);
+        },
+
+        selectCustomer(c) {
+            this.selectedCustomerId = c.id;
+            this.selectedCustomer = c;
+            this.customerSearch = c.name + ' (' + c.contact_no + ')';
+            this.customerDropdownOpen = false;
+        },
+
+        clearCustomer() {
+            this.selectedCustomerId = '';
+            this.selectedCustomer = null;
+            this.customerSearch = '';
+            this.customerDropdownOpen = true;
         },
 
         addIssueTag(tag) {
@@ -65,13 +108,14 @@
                     Book Service Call / नई सर्विस शिकायत
                 </h1>
                 <p class="text-xs text-textMuted mt-0.5 hidden sm:block">
-                    Register machinery breakdown ticket and assign field technician with SLA
+                    Register service ticket with auto product-wise & month-wise Complaint ID
                 </p>
             </div>
         </div>
         <div class="flex items-center gap-2 shrink-0">
-            <span class="text-[11px] font-black uppercase tracking-wider text-secondary bg-blue-50 px-2.5 py-1 rounded-full border border-blue-200">
-                Auto-Generates Ticket ID
+            <span class="text-xs font-black uppercase tracking-wider text-primary bg-primary/10 px-3 py-1 rounded-full border border-primary/20 flex items-center gap-1.5">
+                <i data-lucide="sparkles" class="w-3.5 h-3.5 text-secondary"></i>
+                <span>Auto ID: <strong class="font-mono text-secondary" x-text="currentTicketId"></strong></span>
             </span>
         </div>
     </div>
@@ -87,8 +131,8 @@
             <div class="lg:col-span-7 space-y-5">
                 
                 <!-- CARD 1: CUSTOMER INFORMATION -->
-                <div class="bg-surface rounded-2xl sm:rounded-3xl border border-borderMain shadow-2xs overflow-hidden">
-                    <div class="p-3.5 sm:p-4 border-b border-borderMain bg-bg/50 flex items-center justify-between">
+                <div class="bg-surface rounded-2xl sm:rounded-3xl border border-borderMain shadow-2xs relative z-20">
+                    <div class="p-3.5 sm:p-4 border-b border-borderMain bg-bg/50 rounded-t-2xl sm:rounded-t-3xl flex items-center justify-between">
                         <div class="flex items-center space-x-2">
                             <span class="w-6 h-6 rounded-lg bg-secondary/10 text-secondary flex items-center justify-center font-bold text-xs">
                                 1
@@ -120,23 +164,79 @@
                             </button>
                         </div>
 
-                        <!-- MODE A: EXISTING CUSTOMER SELECTION -->
+                        <!-- MODE A: SEARCHABLE EXISTING CUSTOMER COMBOBOX (Instant Name / Number Search for 1k+ Customers) -->
                         <div x-show="customerMode === 'existing'" x-transition class="space-y-3">
-                            <div>
-                                <label for="customer_id" class="block text-xs font-bold text-slate-700 mb-1">
-                                    Select Customer / ग्राहक चुनें <span class="text-rose-500">*</span>
-                                </label>
-                                <select id="customer_id" 
-                                        name="customer_id" 
-                                        x-model="selectedCustomerId" 
-                                        class="w-full text-xs sm:text-sm font-medium py-2.5 px-3 rounded-xl border border-borderMain bg-white outline-none focus:border-primary">
-                                    <option value="">-- Search & select from registered clients --</option>
-                                    @foreach($customers as $c)
-                                        <option value="{{ $c->id }}" {{ old('customer_id') == $c->id ? 'selected' : '' }}>
-                                            {{ $c->name }} • {{ $c->contact_no }} {{ $c->organization ? '('.$c->organization->name.')' : '' }} {{ $c->area ? '['.$c->area->name.']' : '' }}
-                                        </option>
-                                    @endforeach
-                                </select>
+                            <div class="relative" @click.outside="customerDropdownOpen = false">
+                                <div class="flex items-center justify-between mb-1">
+                                    <label class="block text-xs font-bold text-slate-700">
+                                        Search Customer / ग्राहक खोजें <span class="text-rose-500">*</span>
+                                    </label>
+                                    <span class="text-[11px] text-textMuted" x-text="customers.length + ' clients registered'"></span>
+                                </div>
+
+                                <!-- Hidden input for form submission -->
+                                <input type="hidden" name="customer_id" :value="selectedCustomerId">
+
+                                <!-- Search Input with icon and clear button -->
+                                <div class="relative">
+                                    <i data-lucide="search" class="w-4 h-4 absolute left-3 top-3 text-slate-400"></i>
+                                    <input type="text"
+                                           x-model="customerSearch"
+                                           @focus="customerDropdownOpen = true; if(selectedCustomerId) { $event.target.select(); }"
+                                           @click="customerDropdownOpen = true"
+                                           @input="customerDropdownOpen = true"
+                                           placeholder="Type customer name, 10-digit mobile, firm or area..."
+                                           class="w-full pl-9 pr-9 py-2.5 text-xs sm:text-sm rounded-xl border border-slate-300 bg-white outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 shadow-2xs font-medium">
+
+                                    <button type="button" 
+                                            x-show="customerSearch || selectedCustomerId" 
+                                            @click="clearCustomer()" 
+                                            class="absolute right-2.5 top-2.5 text-slate-400 hover:text-rose-600 p-0.5 rounded transition">
+                                        <i data-lucide="x" class="w-4 h-4"></i>
+                                    </button>
+                                </div>
+
+                                <!-- Dynamic Search Results Dropdown (Floats over following cards smoothly) -->
+                                <div x-show="customerDropdownOpen" 
+                                     x-cloak 
+                                     class="absolute z-50 left-0 right-0 mt-1 max-h-80 overflow-y-auto bg-white rounded-2xl shadow-2xl border border-slate-300 ring-1 ring-black/10 divide-y divide-slate-100">
+                                    
+                                    <div class="p-2.5 bg-slate-50 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between sticky top-0 border-b border-slate-200">
+                                        <span x-text="customerSearch ? 'Matching Clients' : 'Recent Registered Clients'"></span>
+                                        <span class="px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 font-bold" x-text="filteredCustomers.length + ' found'"></span>
+                                    </div>
+
+                                    <template x-for="c in filteredCustomers" :key="c.id">
+                                        <div @click="selectCustomer(c)" 
+                                             class="p-3 hover:bg-blue-50/90 cursor-pointer transition flex items-center justify-between gap-2 text-xs border-b border-slate-100 last:border-b-0"
+                                             :class="selectedCustomerId == c.id ? 'bg-blue-50 font-bold border-l-4 border-l-primary' : ''">
+                                            <div class="min-w-0 flex-1">
+                                                <div class="flex items-center gap-1.5 flex-wrap">
+                                                    <span class="font-extrabold text-slate-900" x-text="c.name"></span>
+                                                    <span x-show="c.organization?.name" class="px-1.5 py-0.5 rounded bg-slate-100 text-[10px] text-slate-600 font-semibold" x-text="c.organization?.name"></span>
+                                                </div>
+                                                <div class="text-[11px] text-slate-500 flex items-center gap-2 mt-1">
+                                                    <span class="font-bold text-slate-700" x-text="'📞 ' + (c.contact_no || 'No Phone')"></span>
+                                                    <span x-show="c.area?.name" class="text-slate-600 font-medium" x-text="'📍 ' + c.area?.name"></span>
+                                                </div>
+                                            </div>
+                                            <button type="button" class="px-3 py-1.5 bg-slate-100 group-hover:bg-primary group-hover:text-white rounded-xl text-[11px] font-bold shrink-0 transition shadow-2xs">
+                                                Select
+                                            </button>
+                                        </div>
+                                    </template>
+
+                                    <template x-if="filteredCustomers.length === 0">
+                                        <div class="p-5 text-center text-xs text-slate-500">
+                                            <p class="font-bold text-slate-700">No customer matching "<span x-text="customerSearch"></span>"</p>
+                                            <button type="button" @click="customerMode = 'new'" class="mt-2.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 font-bold rounded-xl hover:bg-emerald-100 text-xs inline-flex items-center gap-1.5 shadow-2xs">
+                                                <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
+                                                <span>Register as New Customer</span>
+                                            </button>
+                                        </div>
+                                    </template>
+                                </div>
+
                                 @error('customer_id')
                                     <p class="text-rose-600 text-xs mt-1 font-semibold">{{ $message }}</p>
                                 @enderror
@@ -156,17 +256,22 @@
                                         </div>
                                         <div x-show="selectedCustomer.address" class="text-slate-500 text-[11px] truncate" x-text="selectedCustomer.address"></div>
                                     </div>
-                                    <a :href="'tel:' + selectedCustomer.contact_no" 
-                                       class="px-2.5 py-1.5 bg-white border border-blue-300 text-blue-700 rounded-xl text-xs font-bold shrink-0 hover:bg-blue-50 active:scale-95 transition flex items-center gap-1">
-                                        <i data-lucide="phone-call" class="w-3.5 h-3.5"></i>
-                                        <span>Call</span>
-                                    </a>
+                                    <div class="flex items-center gap-1 shrink-0">
+                                        <a :href="'tel:' + selectedCustomer.contact_no" 
+                                           class="px-2.5 py-1.5 bg-white border border-blue-300 text-blue-700 rounded-xl text-xs font-bold shrink-0 hover:bg-blue-50 active:scale-95 transition flex items-center gap-1">
+                                            <i data-lucide="phone-call" class="w-3.5 h-3.5"></i>
+                                            <span>Call</span>
+                                        </a>
+                                        <button type="button" @click="clearCustomer()" class="px-2 py-1.5 bg-white border border-slate-200 text-slate-500 rounded-xl text-xs font-bold hover:bg-slate-50" title="Change Customer">
+                                            Change
+                                        </button>
+                                    </div>
                                 </div>
                             </template>
 
                             <p class="text-[11px] text-textMuted flex items-center gap-1">
                                 <i data-lucide="info" class="w-3.5 h-3.5 text-secondary shrink-0"></i>
-                                <span>Customer not listed? Switch to <strong>"New Customer"</strong> above to register them directly.</span>
+                                <span>Customer not registered? Switch to <strong>"New Customer"</strong> above for instant registration.</span>
                             </p>
                         </div>
 
@@ -289,7 +394,7 @@
                 </div>
 
                 <!-- CARD 2: EQUIPMENT & PROBLEM DIAGNOSIS -->
-                <div class="bg-surface rounded-2xl sm:rounded-3xl border border-borderMain shadow-2xs overflow-hidden">
+                <div class="bg-surface rounded-2xl sm:rounded-3xl border border-borderMain shadow-2xs overflow-hidden relative z-10">
                     <div class="p-3.5 sm:p-4 border-b border-borderMain bg-bg/50 flex items-center justify-between">
                         <div class="flex items-center space-x-2">
                             <span class="w-6 h-6 rounded-lg bg-secondary/10 text-secondary flex items-center justify-center font-bold text-xs">
@@ -303,38 +408,30 @@
                     </div>
 
                     <div class="p-4 sm:p-5 space-y-4">
-                        <!-- Machine Type & Service Type: 2 EQUAL COLUMNS ON DESKTOP, 1 ON MOBILE (No Uper-Neeche misalignment) -->
+                        <!-- Machine Type & Service Type: 2 EQUAL COLUMNS ON DESKTOP, 1 ON MOBILE (Only Computer, Printer, CCTV, Other) -->
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <!-- Product Type (Machine Category) -->
+                            
+                            <!-- Product Type (Computer, Printer, CCTV, Other) -->
                             <div>
                                 <div class="flex items-center justify-between mb-1">
                                     <label class="block text-xs font-bold text-slate-700">
-                                        Machine / Equipment <span class="text-rose-500">*</span>
+                                        Equipment / Product <span class="text-rose-500">*</span>
                                     </label>
-                                    <button type="button" 
-                                            @click="showNewProductInput = !showNewProductInput" 
-                                            class="text-[11px] font-bold text-secondary hover:underline">
-                                        <span x-text="showNewProductInput ? '← Select List' : '+ Add Machine'"></span>
-                                    </button>
+                                    <span class="font-mono text-[11px] font-black text-secondary bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-200" x-text="currentTicketId"></span>
                                 </div>
 
-                                <div x-show="!showNewProductInput">
-                                    <select name="product_type_id" class="w-full text-xs sm:text-sm py-2.5 px-3 rounded-xl border border-slate-300 bg-white outline-none focus:border-primary">
-                                        @foreach($productTypes as $pt)
-                                            <option value="{{ $pt->id }}" {{ old('product_type_id') == $pt->id ? 'selected' : '' }}>
-                                                {{ $pt->name }}
-                                            </option>
-                                        @endforeach
-                                    </select>
-                                </div>
-
-                                <div x-show="showNewProductInput" x-cloak>
-                                    <input type="text" 
-                                           name="new_product_type" 
-                                           value="{{ old('new_product_type') }}" 
-                                           placeholder="Enter machine model or equipment type" 
-                                           class="w-full text-xs sm:text-sm py-2 px-3 rounded-xl border border-amber-400 bg-white focus:border-amber-600">
-                                </div>
+                                <select name="product_type_id" 
+                                        x-model="selectedProductId"
+                                        class="w-full text-xs sm:text-sm py-2.5 px-3 rounded-xl border border-slate-300 bg-white outline-none focus:border-primary font-semibold">
+                                    @foreach($productTypes as $pt)
+                                        <option value="{{ $pt->id }}" {{ old('product_type_id') == $pt->id ? 'selected' : '' }}>
+                                            {{ $pt->name }} (Prefix: {{ $pt->prefix }})
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <p class="text-[10.5px] text-slate-500 mt-1 font-medium">
+                                    Format: <strong>C</strong> (Computer), <strong>P</strong> (Printer), <strong>S</strong> (CCTV), <strong>O</strong> (Other) + YYMM + 001.
+                                </p>
                             </div>
 
                             <!-- Service Type -->
@@ -376,32 +473,38 @@
                                 Complaint / Problem Description <span class="text-rose-500">*</span>
                             </label>
 
-                            <!-- One-Tap Chips -->
+                            <!-- One-Tap Chips (Aligned with Computer, Printer & CCTV breakdowns) -->
                             <div class="flex flex-wrap gap-1.5 mb-2">
-                                <button type="button" @click="addIssueTag('Power Failure (बिजली नहीं आ रही)')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold border border-slate-200 active:scale-95 transition">
-                                    ⚡ Power Failure
+                                <button type="button" @click="addIssueTag('No Power / Not Turning On (चालू नहीं हो रहा)')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold border border-slate-200 active:scale-95 transition">
+                                    ⚡ No Power
                                 </button>
-                                <button type="button" @click="addIssueTag('Abnormal Motor Noise (मोटर आवाज)')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold border border-slate-200 active:scale-95 transition">
-                                    🔊 Motor Noise
+                                <button type="button" @click="addIssueTag('Paper Jam / Roller Issue (कागज़ अटकना)')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold border border-slate-200 active:scale-95 transition">
+                                    🖨️ Paper Jam
                                 </button>
-                                <button type="button" @click="addIssueTag('Overheating (अत्यधिक गर्म होना)')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold border border-slate-200 active:scale-95 transition">
-                                    🌡️ Overheating
+                                <button type="button" @click="addIssueTag('Toner Refill / Cartridge Empty (टोनर खाली)')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold border border-slate-200 active:scale-95 transition">
+                                    🧴 Toner Refill
                                 </button>
-                                <button type="button" @click="addIssueTag('Oil / Air Leakage (लीकेज)')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold border border-slate-200 active:scale-95 transition">
-                                    💧 Leakage
+                                <button type="button" @click="addIssueTag('Camera Offline / No Display (कैमरा बंद)')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold border border-slate-200 active:scale-95 transition">
+                                    📹 Camera Offline
                                 </button>
-                                <button type="button" @click="addIssueTag('Display / Sensor Error (सेंसर खराबी)')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold border border-slate-200 active:scale-95 transition">
-                                    📟 Sensor Error
+                                <button type="button" @click="addIssueTag('Windows / OS Boot Error (विंडोज एरर)')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold border border-slate-200 active:scale-95 transition">
+                                    💻 OS Boot Error
                                 </button>
-                                <button type="button" @click="addIssueTag('Complete Breakdown (मशीन बंद)')" class="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-semibold border border-rose-200 active:scale-95 transition">
-                                    🛑 Breakdown
+                                <button type="button" @click="addIssueTag('Virus / Malware Infection (एंटीवायरस)')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold border border-slate-200 active:scale-95 transition">
+                                    🛡️ Virus Error
+                                </button>
+                                <button type="button" @click="addIssueTag('DVR / NVR Password Reset (पासवर्ड)')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold border border-slate-200 active:scale-95 transition">
+                                    🔑 Password Reset
+                                </button>
+                                <button type="button" @click="addIssueTag('Network / LAN Sharing Issue')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold border border-slate-200 active:scale-95 transition">
+                                    🌐 Network Issue
                                 </button>
                             </div>
 
                             <textarea id="issue_description" 
                                       name="issue_description" 
                                       rows="3" 
-                                      placeholder="Describe the breakdown symptoms or client issue..." 
+                                      placeholder="Describe the problem, fault symptoms, or customer request..." 
                                       class="w-full text-xs sm:text-sm py-2 px-3 rounded-xl border border-slate-300 bg-white leading-relaxed">{{ old('issue_description') }}</textarea>
                             @error('issue_description')
                                 <p class="text-rose-600 text-xs mt-1 font-semibold">{{ $message }}</p>
@@ -518,7 +621,7 @@
                         <!-- Problem Photo Upload -->
                         <div>
                             <label class="block text-xs font-bold text-slate-700 mb-1">
-                                Machine Photo (Optional / फोटो)
+                                Equipment Photo (Optional / फोटो)
                             </label>
                             <label class="flex items-center justify-center space-x-2 px-3 py-2.5 border-2 border-dashed border-borderMain rounded-xl cursor-pointer hover:border-secondary hover:bg-blue-50/30 transition text-xs font-semibold text-textMuted">
                                 <i data-lucide="camera" class="w-4 h-4 text-secondary"></i>
@@ -537,13 +640,11 @@
                 <div class="bg-surface rounded-2xl sm:rounded-3xl border border-borderMain shadow-sm p-4 sm:p-5 space-y-3">
                     <div class="flex items-center justify-between text-xs pb-2 border-b border-borderMain">
                         <span class="font-extrabold text-slate-800">Dispatch Status</span>
-                        <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 uppercase">
-                            Ready to Dispatch
-                        </span>
+                        <span class="font-mono px-2.5 py-0.5 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 uppercase" x-text="currentTicketId"></span>
                     </div>
 
                     <p class="text-[11px] text-textMuted leading-relaxed">
-                        Ticket will be assigned immediately to technician portal with live location and push alert.
+                        Ticket ID is auto-generated based on equipment category and resets to 001 every month. Assigned engineer will be notified immediately.
                     </p>
 
                     <button type="submit" 

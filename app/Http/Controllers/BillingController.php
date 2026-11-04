@@ -19,7 +19,15 @@ class BillingController extends Controller
     public function index(Request $request)
     {
         $user = Auth::user();
-        $query = Bill::with(['complaint', 'organization', 'customer', 'engineer', 'handedOverTo', 'creditCollections']);
+        $query = Bill::with([
+            'complaint.productType', 
+            'complaint.customer.area', 
+            'organization', 
+            'customer.area', 
+            'engineer', 
+            'handedOverTo', 
+            'creditCollections'
+        ]);
 
         if ($user->isEngineer()) {
             $query->where('created_by', $user->id);
@@ -47,21 +55,21 @@ class BillingController extends Controller
             $query->whereDate('created_at', '<=', $request->to_date);
         }
 
-        if ($request->filled('from_date')) {
-            $query->whereDate('created_at', '>=', $request->from_date);
-        }
-
-        if ($request->filled('to_date')) {
-            $query->whereDate('created_at', '<=', $request->to_date);
-        }
-
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function($q) use ($search) {
                 $q->where('bill_number', 'like', "%{$search}%")
                   ->orWhere('gst_bill_number', 'like', "%{$search}%")
+                  ->orWhereHas('complaint', function($cq) use ($search) {
+                      $cq->where('ticket_number', 'like', "%{$search}%")
+                        ->orWhere('issue_description', 'like', "%{$search}%");
+                  })
                   ->orWhereHas('customer', function($cq) use ($search) {
-                      $cq->where('name', 'like', "%{$search}%")->orWhere('contact_no', 'like', "%{$search}%");
+                      $cq->where('name', 'like', "%{$search}%")
+                        ->orWhere('contact_no', 'like', "%{$search}%")
+                        ->orWhereHas('area', function($aq) use ($search) {
+                            $aq->where('name', 'like', "%{$search}%");
+                        });
                   })
                   ->orWhereHas('organization', function($oq) use ($search) {
                       $oq->where('name', 'like', "%{$search}%");
@@ -111,7 +119,14 @@ class BillingController extends Controller
             abort(403, 'Unauthorized. Billing spreadsheet export is restricted to administrators.');
         }
 
-        $query = Bill::with(['customer', 'organization', 'engineer', 'complaint']);
+        $query = Bill::with([
+            'complaint.productType', 
+            'complaint.customer.area', 
+            'customer.area', 
+            'customer.organization', 
+            'organization', 
+            'engineer'
+        ]);
 
         if ($request->filled('engineer_id')) {
             $query->where('created_by', $request->engineer_id);
@@ -138,8 +153,16 @@ class BillingController extends Controller
             $query->where(function($q) use ($search) {
                 $q->where('bill_number', 'like', "%{$search}%")
                   ->orWhere('gst_bill_number', 'like', "%{$search}%")
+                  ->orWhereHas('complaint', function($cq) use ($search) {
+                      $cq->where('ticket_number', 'like', "%{$search}%")
+                        ->orWhere('issue_description', 'like', "%{$search}%");
+                  })
                   ->orWhereHas('customer', function($cq) use ($search) {
-                      $cq->where('name', 'like', "%{$search}%")->orWhere('contact_no', 'like', "%{$search}%");
+                      $cq->where('name', 'like', "%{$search}%")
+                        ->orWhere('contact_no', 'like', "%{$search}%")
+                        ->orWhereHas('area', function($aq) use ($search) {
+                            $aq->where('name', 'like', "%{$search}%");
+                        });
                   })
                   ->orWhereHas('organization', function($oq) use ($search) {
                       $oq->where('name', 'like', "%{$search}%");
@@ -149,7 +172,7 @@ class BillingController extends Controller
 
         $bills = $query->latest()->get();
 
-        $filename = "Bhumi_Technocare_Bills_" . date('Y-m-d_His') . ".csv";
+        $filename = "Bhumi_Billing_Ledger_" . date('Y-m-d_His') . ".csv";
         $headers = [
             "Content-type" => "text/csv; charset=UTF-8",
             "Content-Disposition" => "attachment; filename=\"$filename\"",
@@ -158,13 +181,15 @@ class BillingController extends Controller
             "Expires" => "0"
         ];
 
+        // Simplified Billing Ledger Export (ONLY 6 Required Columns):
+        // 1. COMPLAINT ID, 2. CUSTOMER NAME, 3. AREA, 4. MOBILE NUMBER, 5. PROBLEM, 6. DATE (DD-MM-YYYY)
         $columns = [
-            'Bill No',
-            'Date/Time',
-            'Amount',
-            'Payment',
-            'Remark',
-            'Photo'
+            'COMPLAINT ID',
+            'CUSTOMER NAME',
+            'AREA',
+            'MOBILE NUMBER',
+            'PROBLEM',
+            'DATE'
         ];
 
         $callback = function() use ($bills, $columns) {
@@ -174,14 +199,39 @@ class BillingController extends Controller
             fputcsv($file, $columns);
 
             foreach ($bills as $bill) {
-                $photoUrl = $bill->photo ? asset('storage/' . $bill->photo) : ($bill->asset_photo ? asset('storage/' . $bill->asset_photo) : 'No Photo');
+                $complaint = $bill->complaint;
+                $customer = $bill->customer ?: $complaint?->customer;
+
+                // 1. COMPLAINT ID (Must show original complaint ID, not bill number)
+                $complaintId = $complaint?->ticket_number ?? 'N/A';
+
+                // 2. CUSTOMER NAME
+                $customerName = $customer?->name ?? ($bill->organization?->name ?? 'Walk-in / Direct');
+                if ($bill->organization && $customer && $customer->name !== $bill->organization->name) {
+                    $customerName .= ' (' . $bill->organization->name . ')';
+                } elseif ($customer?->organization && $customer->name !== $customer->organization->name) {
+                    $customerName .= ' (' . $customer->organization->name . ')';
+                }
+
+                // 3. AREA
+                $area = $customer?->area?->name ?? ($complaint?->customer?->area?->name ?? 'N/A');
+
+                // 4. MOBILE NUMBER
+                $mobileNumber = $customer?->contact_no ?? ($complaint?->customer?->contact_no ?? 'N/A');
+
+                // 5. PROBLEM
+                $problem = $complaint?->issue_description ?? ($bill->remarks ?? 'N/A');
+
+                // 6. DATE (Properly formatted as DD-MM-YYYY)
+                $date = $bill->created_at ? $bill->created_at->format('d-m-Y') : ($complaint?->created_at ? $complaint->created_at->format('d-m-Y') : '');
+
                 fputcsv($file, [
-                    $bill->bill_number,
-                    $bill->created_at->format('d/m/Y h:i A'),
-                    $bill->amount,
-                    strtoupper($bill->bill_type == 'bill' ? 'GST Bill' : $bill->bill_type),
-                    $bill->remarks ?? '',
-                    $photoUrl
+                    $complaintId,
+                    $customerName,
+                    $area,
+                    $mobileNumber,
+                    $problem,
+                    $date
                 ]);
             }
             fclose($file);

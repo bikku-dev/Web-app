@@ -95,7 +95,13 @@ class ComplaintController extends Controller
         $engineers = User::where('role', 'engineer')->where('is_active', true)->get();
         $areas = Area::where('is_active', true)->with('cities')->get();
 
-        return view('complaints.create', compact('customers', 'firms', 'productTypes', 'serviceTypes', 'engineers', 'areas'));
+        // Calculate live predicted ticket ID for each product type (e.g. C2611001, P2611001, S2611001, O2611001)
+        $predictedIds = [];
+        foreach ($productTypes as $pt) {
+            $predictedIds[$pt->id] = Complaint::generateTicketNumber($pt->id);
+        }
+
+        return view('complaints.create', compact('customers', 'firms', 'productTypes', 'serviceTypes', 'engineers', 'areas', 'predictedIds'));
     }
 
     public function store(Request $request)
@@ -216,9 +222,8 @@ class ComplaintController extends Controller
             $photoPath = $request->file('photo')->store('complaints/initial', 'public');
         }
 
-        // Generate Ticket Number
-        $count = Complaint::count() + 1;
-        $ticketNumber = 'CMP-' . date('Y') . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
+        // Generate Product & Month-wise Ticket Number (e.g. S2611001, C2611001, P2611001, O2611001)
+        $ticketNumber = Complaint::generateTicketNumber($productTypeId);
 
         $complaint = Complaint::create([
             'ticket_number' => $ticketNumber,
@@ -381,4 +386,5 @@ class ComplaintController extends Controller
         $complaint->load(['customer', 'organization', 'engineer', 'productType', 'serviceType', 'bill']);
         return view('pdf.ticket', compact('complaint'));
     }
+
 }

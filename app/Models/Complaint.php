@@ -61,6 +61,34 @@ class Complaint extends Model
         return $this->belongsTo(ServiceType::class);
     }
 
+    public static function generateTicketNumber($productTypeId = null): string
+    {
+        $prefix = 'O';
+        if ($productTypeId) {
+            $product = ProductType::find($productTypeId);
+            if ($product) {
+                $prefix = $product->prefix;
+            }
+        }
+
+        // 2-digit Year (e.g. '26') and 2-digit Month (e.g. '11' for Nov, '12' for Dec)
+        $yearMonth = date('ym');
+        $basePrefix = $prefix . $yearMonth;
+
+        // Find existing complaints starting with basePrefix in the current month
+        $latest = static::withTrashed()
+            ->where('ticket_number', 'LIKE', "{$basePrefix}%")
+            ->orderByRaw("CAST(SUBSTRING(ticket_number, " . (strlen($basePrefix) + 1) . ") AS UNSIGNED) DESC")
+            ->first();
+
+        $seq = 1;
+        if ($latest && preg_match('/^' . preg_quote($basePrefix, '/') . '(\d+)$/', $latest->ticket_number, $matches)) {
+            $seq = ((int)$matches[1]) + 1;
+        }
+
+        return $basePrefix . str_pad($seq, 3, '0', STR_PAD_LEFT);
+    }
+
     public function engineer()
     {
         return $this->belongsTo(User::class, 'engineer_id');
